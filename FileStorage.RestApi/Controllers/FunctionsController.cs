@@ -7,8 +7,12 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Net;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
@@ -20,11 +24,13 @@ namespace FileStorage.RestApi.Controllers
     {
         private readonly AppDbContext context;
         private readonly IMapper mapper;
+        private readonly IConfiguration configuration;
 
-        public FunctionsController(AppDbContext context, IMapper mapper)
+        public FunctionsController(AppDbContext context, IMapper mapper, IConfiguration configuration)
         {
             this.context = context;
             this.mapper = mapper;
+            this.configuration = configuration;
         }
 
         [HttpPost(nameof(Register))]
@@ -84,6 +90,35 @@ namespace FileStorage.RestApi.Controllers
         {
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme).ConfigureAwait(false);
             return NoContent();
+        }
+
+        [HttpPost(nameof(UploadFile))]
+        public async Task<IActionResult> UploadFile(IFormFile formFile)
+        {
+            string fileName, filePath, fullFilePath;
+            do
+            {
+                fileName = CreateFileName(formFile);
+                filePath = Path.Combine(configuration["StoredFilesDirectory"], fileName);
+                fullFilePath = Path.Combine(configuration["StoredFilesPath"], fileName);
+
+            } while (System.IO.File.Exists(fullFilePath));
+            using (var stream = System.IO.File.Create(fullFilePath))
+            {
+                await formFile.CopyToAsync(stream).ConfigureAwait(false);
+            }
+            
+            return Created(new Uri(filePath), filePath);
+        }
+
+        private static string CreateFileName(IFormFile formFile)
+        {
+            var fileName = Path.GetFileNameWithoutExtension(formFile.FileName);
+            fileName = WebUtility.HtmlEncode(fileName);
+            var fileNameRandomSuffix = Path.GetFileNameWithoutExtension(Path.GetRandomFileName()) + "_" + Guid.NewGuid().ToString();
+            fileName = fileName + "_" + fileNameRandomSuffix;
+            fileName += Path.GetExtension(formFile.FileName);
+            return fileName;
         }
 
         private async Task<User> AuthtenticateUser(string email, string password)
