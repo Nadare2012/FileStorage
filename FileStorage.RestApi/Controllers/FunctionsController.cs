@@ -60,14 +60,14 @@ namespace FileStorage.RestApi.Controllers
         }
 
         [HttpPost(nameof(SignIn))]
-        public async Task<IActionResult> SignIn(UserRegisterDto userRegisterDto)
+        public async Task<IActionResult> SignIn(UserSignInDto userSignInDto)
         {
             if (!ModelState.IsValid)
             {
                 return Unauthorized();
             }
 
-            User user = await AuthtenticateUser(userRegisterDto.Email, userRegisterDto.Password).ConfigureAwait(false);
+            User user = await AuthtenticateUser(userSignInDto.Email, userSignInDto.Password).ConfigureAwait(false);
             if (user == null)
             {
                 return Unauthorized();
