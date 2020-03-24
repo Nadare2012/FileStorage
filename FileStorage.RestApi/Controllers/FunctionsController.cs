@@ -4,12 +4,14 @@ using FileStorage.RestApi.Models;
 using FileStorage.RestApi.Models.Dto;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -36,10 +38,6 @@ namespace FileStorage.RestApi.Controllers
         [HttpPost(nameof(Register))]
         public async Task<ActionResult<UserRegisterDto>> Register(UserRegisterDto userRegisterDto)
         {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest();
-            }
             userRegisterDto.UserId = 0;
             var user = mapper.Map<User>(userRegisterDto);
             context.Users.Add(user);
@@ -75,10 +73,11 @@ namespace FileStorage.RestApi.Controllers
 
             var claims = new List<Claim>
             {
+                new Claim(ClaimsIdentity.DefaultNameClaimType, user.UserId.ToString(CultureInfo.InvariantCulture)),
                 new Claim(ClaimTypes.Name, user.UserName),
                 new Claim(ClaimTypes.Email, user.Email)
             };
-            var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme, ClaimsIdentity.DefaultNameClaimType, ClaimsIdentity.DefaultRoleClaimType);
 
             await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(claimsIdentity)).ConfigureAwait(false);
 
@@ -107,7 +106,7 @@ namespace FileStorage.RestApi.Controllers
             {
                 await formFile.CopyToAsync(stream).ConfigureAwait(false);
             }
-            
+
             return Created(new Uri(filePath), filePath);
         }
 
