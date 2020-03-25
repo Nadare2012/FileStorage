@@ -15,6 +15,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Mime;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
@@ -36,6 +37,11 @@ namespace FileStorage.RestApi.Controllers
         }
 
         [HttpPost(nameof(Register))]
+        [Consumes(MediaTypeNames.Application.Json)]
+        [Produces(MediaTypeNames.Application.Json)]
+        [ProducesResponseType(StatusCodes.Status201Created)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
         public async Task<ActionResult<UserRegisterDto>> Register(UserRegisterDto userRegisterDto)
         {
             userRegisterDto.UserId = 0;
@@ -59,6 +65,10 @@ namespace FileStorage.RestApi.Controllers
         }
 
         [HttpPost(nameof(SignIn))]
+        [Consumes(MediaTypeNames.Application.Json)]
+        [Produces(MediaTypeNames.Application.Json)]
+        [ProducesResponseType(StatusCodes.Status302Found)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> SignIn(UserSignInDto userSignInDto)
         {
             User user = await GetUser(userSignInDto.Email, userSignInDto.Password).ConfigureAwait(false);
@@ -71,6 +81,7 @@ namespace FileStorage.RestApi.Controllers
         }
 
         [HttpGet(nameof(SignOut))]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
         public async Task<IActionResult> SignOut()
         {
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme).ConfigureAwait(false);
@@ -78,9 +89,18 @@ namespace FileStorage.RestApi.Controllers
         }
 
         [Authorize]
+        [Produces(MediaTypeNames.Application.Json)]
+        [ProducesResponseType(StatusCodes.Status201Created)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [HttpPost(nameof(UploadFile))]
         public async Task<IActionResult> UploadFile(IFormFile formFile)
         {
+            if (formFile == null)
+            {
+                return BadRequest();
+            }
             CreateFilePaths(formFile, out string filePath, out string fullFilePath);
             using (var stream = System.IO.File.Create(fullFilePath))
             {

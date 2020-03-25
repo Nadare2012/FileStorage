@@ -4,17 +4,19 @@ using FileStorage.RestApi.Data;
 using FileStorage.RestApi.Models;
 using FileStorage.RestApi.Models.Dto;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Net.Mime;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace FileStorage.RestApi.Controllers
 {
-    [Route("api")]
+    [Route("api/v1")]
     [ApiController]
     public class FilesController : ControllerBase
     {
@@ -29,6 +31,9 @@ namespace FileStorage.RestApi.Controllers
 
         // GET: api/Files
         [HttpGet("[controller]")]
+        [Produces(MediaTypeNames.Application.Json)]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+
         public async Task<ActionResult<IEnumerable<FileDto>>> GetFiles()
         {
             return await context.Files.ProjectTo<FileDto>(mapper.ConfigurationProvider).ToListAsync().ConfigureAwait(false);
@@ -36,6 +41,9 @@ namespace FileStorage.RestApi.Controllers
 
         // GET: api/Files/5
         [HttpGet("[controller]/{id}")]
+        [Produces(MediaTypeNames.Application.Json)]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<FileDto>> GetFile(int id)
         {
             var File = await context.Files.FindAsync(id);
@@ -50,6 +58,9 @@ namespace FileStorage.RestApi.Controllers
 
         // GET: api/Users/5/Files
         [HttpGet("Users/{userId}/[controller]")]
+        [Produces(MediaTypeNames.Application.Json)]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<IEnumerable<FileDto>>> GetFilesOfUser(int userId)
         {
             var user = await context.Users.FindAsync(userId);
@@ -62,6 +73,9 @@ namespace FileStorage.RestApi.Controllers
 
         // GET: api/Users/5/Files/5
         [HttpGet("Users/{userId}/[controller]/{fileId}")]
+        [Produces(MediaTypeNames.Application.Json)]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<FileDto>> GetFileOfUser(int userId, int fileId)
         {
             var post = await context.Files.FirstOrDefaultAsync(file => file.UserId == userId && file.FileId == fileId).ConfigureAwait(false);
@@ -76,6 +90,13 @@ namespace FileStorage.RestApi.Controllers
         // POST: api/Users/5/Files
         [Authorize]
         [HttpPost("Users/{userId}/[controller]")]
+        [Consumes(MediaTypeNames.Application.Json)]
+        [Produces(MediaTypeNames.Application.Json)]
+        [ProducesResponseType(StatusCodes.Status201Created)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<FileDto>> PostFileOfUser(FileDto fileDto, int userId)
         {
             if (GetUserId() != userId)
@@ -98,6 +119,11 @@ namespace FileStorage.RestApi.Controllers
         // DELETE: api/Users/5/Files/5
         [Authorize]
         [HttpDelete("Users/{userId}/[controller]/{fileId}")]
+        [Produces(MediaTypeNames.Application.Json)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<FileDto>> DeletePostOfUser(int userId, int fileId)
         {
             if (GetUserId() != userId)

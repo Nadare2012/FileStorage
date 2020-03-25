@@ -10,6 +10,7 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using System.IO;
 using System.Threading.Tasks;
+using Microsoft.OpenApi.Models;
 
 namespace FileStorage.RestApi
 {
@@ -45,6 +46,10 @@ namespace FileStorage.RestApi
                     return Task.CompletedTask;
                 };
             });
+            services.AddSwaggerGen(c =>
+            {
+                c.SwaggerDoc("v1", new OpenApiInfo { Title = "File Storage API", Version = "v1" });
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -62,7 +67,11 @@ namespace FileStorage.RestApi
             });
 
             app.UseHttpsRedirection();
-
+            app.UseSwagger();
+            app.UseSwaggerUI(c =>
+            {
+                c.SwaggerEndpoint("/swagger/v1/swagger.json", "File Storage API");
+            });
             app.UseRouting();
 
             app.UseAuthentication();
