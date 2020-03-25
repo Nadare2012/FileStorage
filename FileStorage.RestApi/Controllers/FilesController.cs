@@ -3,10 +3,13 @@ using AutoMapper.QueryableExtensions;
 using FileStorage.RestApi.Data;
 using FileStorage.RestApi.Models;
 using FileStorage.RestApi.Models.Dto;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace FileStorage.RestApi.Controllers
@@ -45,21 +48,6 @@ namespace FileStorage.RestApi.Controllers
             return FileDto;
         }
 
-        // DELETE: api/Files/5
-        [HttpDelete("[controller]/{id}")]
-        public async Task<IActionResult> DeleteFile(int id)
-        {
-            var file = await context.Files.FindAsync(id);
-            if (file == null)
-            {
-                return NotFound();
-            }
-
-            context.Files.Remove(file);
-            await context.SaveChangesAsync().ConfigureAwait(false);
-            return NoContent();
-        }
-
         // GET: api/Users/5/Files
         [HttpGet("Users/{userId}/[controller]")]
         public async Task<ActionResult<IEnumerable<FileDto>>> GetFilesOfUser(int userId)
@@ -86,9 +74,14 @@ namespace FileStorage.RestApi.Controllers
         }
 
         // POST: api/Users/5/Files
+        [Authorize]
         [HttpPost("Users/{userId}/[controller]")]
         public async Task<ActionResult<FileDto>> PostFileOfUser(FileDto fileDto, int userId)
         {
+            if (GetUserId() != userId)
+            {
+                return Forbid();
+            }
             if (!context.Users.Any(e => e.UserId == userId))
             {
                 return NotFound();
@@ -103,9 +96,14 @@ namespace FileStorage.RestApi.Controllers
         }
 
         // DELETE: api/Users/5/Files/5
+        [Authorize]
         [HttpDelete("Users/{userId}/[controller]/{fileId}")]
         public async Task<ActionResult<FileDto>> DeletePostOfUser(int userId, int fileId)
         {
+            if (GetUserId() != userId)
+            {
+                return Forbid();
+            }
             var file = await context.Files.FirstOrDefaultAsync(file => file.UserId == userId && file.FileId == fileId).ConfigureAwait(false);
             if (file == null)
             {
@@ -115,6 +113,11 @@ namespace FileStorage.RestApi.Controllers
             context.Files.Remove(file);
             await context.SaveChangesAsync().ConfigureAwait(false);
             return NoContent();
+        }
+
+        private int GetUserId()
+        {
+            return int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value, CultureInfo.InvariantCulture);
         }
     }
 }
