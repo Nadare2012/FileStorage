@@ -53,6 +53,7 @@ namespace FileStorage.RestApi.Controllers
                 }
                 throw;
             }
+            await Authorize(user).ConfigureAwait(false);
             userRegisterDto = mapper.Map<UserRegisterDto>(user);
             return CreatedAtRoute(nameof(UsersController.GetUser), new { id = userRegisterDto.UserId }, userRegisterDto);
         }
@@ -60,27 +61,12 @@ namespace FileStorage.RestApi.Controllers
         [HttpPost(nameof(SignIn))]
         public async Task<IActionResult> SignIn(UserSignInDto userSignInDto)
         {
-            if (!ModelState.IsValid)
-            {
-                return Unauthorized();
-            }
-
-            User user = await AuthtenticateUser(userSignInDto.Email, userSignInDto.Password).ConfigureAwait(false);
+            User user = await GetUser(userSignInDto.Email, userSignInDto.Password).ConfigureAwait(false);
             if (user == null)
             {
-                return Unauthorized();
+                return NotFound();
             }
-
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimsIdentity.DefaultNameClaimType, user.UserId.ToString(CultureInfo.InvariantCulture)),
-                new Claim(ClaimTypes.Name, user.UserName),
-                new Claim(ClaimTypes.Email, user.Email)
-            };
-            var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme, ClaimsIdentity.DefaultNameClaimType, ClaimsIdentity.DefaultRoleClaimType);
-
-            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(claimsIdentity)).ConfigureAwait(false);
-
+            await Authorize(user).ConfigureAwait(false);
             return RedirectToRoute(nameof(UsersController.GetUser), new { id = user.UserId });
         }
 
@@ -91,10 +77,40 @@ namespace FileStorage.RestApi.Controllers
             return NoContent();
         }
 
+        [Authorize]
         [HttpPost(nameof(UploadFile))]
         public async Task<IActionResult> UploadFile(IFormFile formFile)
         {
-            string fileName, filePath, fullFilePath;
+            CreateFilePaths(formFile, out string filePath, out string fullFilePath);
+            using (var stream = System.IO.File.Create(fullFilePath))
+            {
+                await formFile.CopyToAsync(stream).ConfigureAwait(false);
+            }
+
+            return CreatedAtAction(nameof(UploadFile), filePath);
+        }
+
+        private async Task Authorize(User user)
+        {
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString(CultureInfo.InvariantCulture)),
+                new Claim(ClaimTypes.Name, user.UserName),
+                new Claim(ClaimTypes.Email, user.Email)
+            };
+            var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme, ClaimsIdentity.DefaultNameClaimType, ClaimsIdentity.DefaultRoleClaimType);
+
+            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(claimsIdentity)).ConfigureAwait(false);
+        }
+
+        private async Task<User> GetUser(string email, string password)
+        {
+            return await context.Users.FirstOrDefaultAsync(u => u.Email == email && u.Password == password).ConfigureAwait(false);
+        }
+
+        private void CreateFilePaths(IFormFile formFile, out string filePath, out string fullFilePath)
+        {
+            string fileName;
             do
             {
                 fileName = CreateFileName(formFile);
@@ -102,12 +118,6 @@ namespace FileStorage.RestApi.Controllers
                 fullFilePath = Path.Combine(configuration["StoredFilesPath"], fileName);
 
             } while (System.IO.File.Exists(fullFilePath));
-            using (var stream = System.IO.File.Create(fullFilePath))
-            {
-                await formFile.CopyToAsync(stream).ConfigureAwait(false);
-            }
-
-            return Created(new Uri(filePath), filePath);
         }
 
         private static string CreateFileName(IFormFile formFile)
@@ -118,11 +128,6 @@ namespace FileStorage.RestApi.Controllers
             fileName = fileName + "_" + fileNameRandomSuffix;
             fileName += Path.GetExtension(formFile.FileName);
             return fileName;
-        }
-
-        private async Task<User> AuthtenticateUser(string email, string password)
-        {
-            return await context.Users.FirstOrDefaultAsync(u => u.Email == email && u.Password == password).ConfigureAwait(false);
         }
     }
 }
