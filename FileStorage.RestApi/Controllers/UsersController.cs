@@ -1,12 +1,14 @@
 ﻿using AutoMapper;
 using AutoMapper.QueryableExtensions;
 using FileStorage.RestApi.Data;
-using FileStorage.RestApi.Models;
 using FileStorage.RestApi.Models.Dto;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace FileStorage.RestApi.Controllers
@@ -44,26 +46,34 @@ namespace FileStorage.RestApi.Controllers
             return userDto;
         }
 
+
         // PUT: api/Users/5
-        [HttpPut("[controller]/{id}")]
+        [Authorize]
+        [HttpPut("{id}")]
         public async Task<IActionResult> PutUser(int id, UserDto userDto)
         {
             if (id != userDto.UserId)
             {
                 return BadRequest();
             }
-            var user = mapper.Map<User>(userDto);
+            if (GetUserId() != id)
+            {
+                return Forbid();
+            }
+            var user = await context.Users.FindAsync(id);
+            if (user == null)
+            {
+                return NotFound();
+            }
+            user.UserName = userDto.UserName;
+            user.Email = userDto.Email;
             context.Entry(user).State = EntityState.Modified;
             try
             {
                 await context.SaveChangesAsync().ConfigureAwait(false);
             }
-            catch (DbUpdateConcurrencyException)
+            catch (DbUpdateException)
             {
-                if (!context.Users.Any(e => e.UserId == id))
-                {
-                    return NotFound();
-                }
                 if (context.Users.Any(u => u.UserName == userDto.UserName || u.Email == userDto.Email))
                 {
                     return Conflict();
@@ -74,6 +84,11 @@ namespace FileStorage.RestApi.Controllers
                 }
             }
             return NoContent();
+        }
+
+        private int GetUserId()
+        {
+            return int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value, CultureInfo.InvariantCulture);
         }
     }
 }
