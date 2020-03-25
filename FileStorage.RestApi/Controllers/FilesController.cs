@@ -45,23 +45,6 @@ namespace FileStorage.RestApi.Controllers
             return FileDto;
         }
 
-        // POST: api/Files
-        [HttpPost("[controller]")]
-        public async Task<ActionResult<FileDto>> PostFile(FileDto fileDto)
-        {
-            if (!context.Users.Any(e => e.UserId == fileDto.UserId))
-            {
-                return NotFound();
-            }
-
-            fileDto.FileId = 0;
-            var file = mapper.Map<File>(fileDto);
-            context.Files.Add(file);
-            await context.SaveChangesAsync().ConfigureAwait(false);
-            fileDto = mapper.Map<FileDto>(file);
-            return CreatedAtAction(nameof(GetFile), new { id = fileDto.FileId }, fileDto);
-        }
-
         // DELETE: api/Files/5
         [HttpDelete("[controller]/{id}")]
         public async Task<IActionResult> DeleteFile(int id)
